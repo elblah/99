@@ -69,37 +69,43 @@ function BaseProvider:make_request(query, request, observer)
   local command = self:_build_command(query, request)
   logger:debug("make_request", "command", command)
 
+  local opts = {
+    text = true,
+    stdout = vim.schedule_wrap(function(err, data)
+      logger:debug("stdout", "data", data)
+      if request:is_cancelled() then
+        once_complete("cancelled", "")
+        return
+      end
+      if err and err ~= "" then
+        logger:debug("stdout#error", "err", err)
+      end
+      if not err and data then
+        observer.on_stdout(data)
+      end
+    end),
+    stderr = vim.schedule_wrap(function(err, data)
+      logger:debug("stderr", "data", data)
+      if request:is_cancelled() then
+        once_complete("cancelled", "")
+        return
+      end
+      if err and err ~= "" then
+        logger:debug("stderr#error", "err", err)
+      end
+      if not err then
+        observer.on_stderr(data)
+      end
+    end),
+  }
+
+  if self._get_stdin_input then
+    opts.stdin = self:_get_stdin_input(query, request)
+  end
+
   local proc = vim.system(
     command,
-    {
-      text = true,
-      stdout = vim.schedule_wrap(function(err, data)
-        logger:debug("stdout", "data", data)
-        if request:is_cancelled() then
-          once_complete("cancelled", "")
-          return
-        end
-        if err and err ~= "" then
-          logger:debug("stdout#error", "err", err)
-        end
-        if not err and data then
-          observer.on_stdout(data)
-        end
-      end),
-      stderr = vim.schedule_wrap(function(err, data)
-        logger:debug("stderr", "data", data)
-        if request:is_cancelled() then
-          once_complete("cancelled", "")
-          return
-        end
-        if err and err ~= "" then
-          logger:debug("stderr#error", "err", err)
-        end
-        if not err then
-          observer.on_stderr(data)
-        end
-      end),
-    },
+    opts,
     vim.schedule_wrap(function(obj)
       if request:is_cancelled() then
         once_complete("cancelled", "")
@@ -201,8 +207,40 @@ function CursorAgentProvider._get_default_model()
   return "sonnet-4.5"
 end
 
+--- @class CustomProvider : _99.Providers.BaseProvider
+local CustomProvider = setmetatable({}, { __index = BaseProvider })
+
+--- @param cmd string
+--- @return CustomProvider
+function CustomProvider.new(cmd)
+  return setmetatable({ _cmd = cmd }, { __index = CustomProvider })
+end
+
+--- @param self CustomProvider
+--- @param query string
+--- @param request _99.Request
+--- @return string[]
+function CustomProvider._build_command(self, query, _)
+  return { self._cmd }
+end
+
+--- @param self CustomProvider
+--- @param query string
+--- @param request _99.Request
+--- @return string
+function CustomProvider._get_stdin_input(self, query, request)
+  return query
+end
+
+--- @param self CustomProvider
+--- @return string
+function CustomProvider._get_provider_name(self)
+  return "CustomProvider"
+end
+
 return {
   OpenCodeProvider = OpenCodeProvider,
   ClaudeCodeProvider = ClaudeCodeProvider,
   CursorAgentProvider = CursorAgentProvider,
+  CustomProvider = CustomProvider,
 }

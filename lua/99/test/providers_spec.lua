@@ -61,6 +61,19 @@ describe("providers", function()
     end)
   end)
 
+  describe("CustomProvider", function()
+    it("builds correct command", function()
+      local provider = Providers.CustomProvider.new("/path/to/script.sh")
+      local cmd = Providers.CustomProvider._build_command(provider, "test query", {})
+      eq({ "/path/to/script.sh", "test query" }, cmd)
+    end)
+
+    it("returns correct provider name", function()
+      local provider = Providers.CustomProvider.new("/path/to/script.sh")
+      eq("CustomProvider", Providers.CustomProvider._get_provider_name(provider))
+    end)
+  end)
+
   describe("provider integration", function()
     it("can be set as provider override", function()
       local _99 = require("99")
@@ -112,6 +125,25 @@ describe("providers", function()
       })
       local state = _99.__get_state()
       eq("custom-model", state.model)
+    end)
+
+    it("sets CustomProvider when custom_provider_cmd is specified", function()
+      local _99 = require("99")
+
+      _99.setup({ custom_provider_cmd = "/usr/bin/my-ai" })
+      local state = _99.__get_state()
+      eq("CustomProvider", state.provider_override:_get_provider_name())
+    end)
+
+    it("custom_provider_cmd takes priority over provider parameter", function()
+      local _99 = require("99")
+
+      _99.setup({
+        custom_provider_cmd = "/usr/bin/my-ai",
+        provider = Providers.ClaudeCodeProvider,
+      })
+      local state = _99.__get_state()
+      eq("CustomProvider", state.provider_override:_get_provider_name())
     end)
   end)
 

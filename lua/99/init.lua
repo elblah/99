@@ -96,6 +96,7 @@ end
 --- @field model string?
 --- @field md_files string[]?
 --- @field provider _99.Providers.BaseProvider?
+--- @field custom_provider_cmd string?
 --- @field debug_log_prefix string?
 --- @field display_errors? boolean
 --- @field auto_add_skills? boolean
@@ -441,7 +442,14 @@ end
 function _99.setup(opts)
   opts = opts or {}
   _99_state = _99_State.new()
-  _99_state.provider_override = opts.provider
+
+  if opts.custom_provider_cmd then
+    assert(type(opts.custom_provider_cmd) == "string", "opts.custom_provider_cmd is not a string")
+    _99_state.provider_override = Providers.CustomProvider.new(opts.custom_provider_cmd)
+  else
+    _99_state.provider_override = opts.provider
+  end
+
   _99_state.completion = opts.completion
     or {
       source = nil,
@@ -469,7 +477,7 @@ function _99.setup(opts)
     assert(type(opts.model) == "string", "opts.model is not a string")
     _99_state.model = opts.model
   else
-    local provider = opts.provider or Providers.OpenCodeProvider
+    local provider = _99_state.provider_override or Providers.OpenCodeProvider
     if provider._get_default_model then
       _99_state.model = provider._get_default_model()
     end
